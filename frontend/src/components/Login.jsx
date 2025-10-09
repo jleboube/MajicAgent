@@ -14,7 +14,8 @@ function Login() {
   return (
     <div className="app-shell login-shell">
       <div className="card login-card">
-        <h1 className="brand">Majic Automation Suite</h1>
+        <img src="/majicagent-logo.svg" alt="MajicAgent" className="brand-logo" />
+        <h1 className="brand">MajicAgent</h1>
         <p className="subtitle">All-in-one assistant for high-performing real estate teams.</p>
 
         <button type="button" className="primary-button" onClick={handleGoogleSignIn}>

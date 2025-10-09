@@ -17,6 +17,7 @@ function AppLayout() {
     <div className="app-shell">
       <header className="app-nav">
         <div className="app-nav__brand">
+          <img src="/majicagent-logo.svg" alt="" aria-hidden="true" />
           <NavLink to="/">MajicAgent</NavLink>
         </div>
         <nav className="app-nav__links">
