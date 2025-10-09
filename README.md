@@ -1,15 +1,84 @@
-# ✨ Magic Photo Service
+# ✨ MajicAgent
 
 ## 🚀 Real Estate Assistant Platform
 
-MajicAgent is the command center for real estate professionals—an agent-first platform that connects every Majic component into one frictionless experience. The suite currently ships with:
+MajicAgent is the command center for real estate professionals—an agent-first platform that removes friction from lead intake all the way through transaction close. It is built on four core modules that share a single agent graph (leads, listings, tasks, cadences, artifacts) and a unified AI/automation layer.
 
-- **Majic Photo Studio** – AI-powered staging and photo enhancements.
-- **Listing Command Center** – Task automation, document vault, and marketing copy generation.
-- **Majic Messenger** *(waitlist)* – Orchestrated email/SMS follow-up journeys.
-- **Market Insights** *(preview)* – Predictive analytics for listings and retention.
+### Current Features
 
-Every module reads from the same agent graph (leads, listings, tasks, artifacts) so data never silos.
+- **Majic Photo Studio**
+  - Embedded staging studio with AI-powered enhancements.
+  - One-click “Open in new tab” and direct embed for live editing.
+  - Asset vault uses Akamai object storage with user-level isolation.
+
+- **Listing Command Center**
+  - Create/import listings with guided forms.
+  - “Next Best Actions” card surfaces outstanding tasks (pricing, marketing, seller comms).
+  - AI-generated MLS description, social caption, email subject/body.
+  - Quick actions: copy to clipboard, spin up a Messenger cadence, or trigger n8n workflows.
+
+- **Majic Messenger**
+  - Cadence builder for email/SMS/voice touchpoints.
+  - Auto-seeded “New Lead Drip” and “Listing Updates” cadences whenever a lead/listing is created.
+  - Active/inactive toggles and metrics (sent/open/responded counts).
+
+- **Market Insights**
+  - Lead-stage distribution with momentum callouts.
+  - Listing rollups with total value, status counts, and seller reporting prompts.
+  - Live task/interaction feed for quick follow-up.
+
+- **Secure Artifact Vault**
+  - Upload/download artifacts with presigned URLs.
+  - Uploaded documents/photos are tagged to the owner and stored in Akamai buckets.
+  - Storage health badge confirms object storage reachability.
+
+- **Authentication & Permissions**
+  - Google OAuth-only onboarding.
+  - Roles: solo_agent (today) with expansion path to team_admin and broker_admin.
+
+- **AI & Automation Indicators**
+  - Dashboard badges confirm OpenAI/Claude readiness and n8n connectivity.
+  - Buyer intake and listing guidance prompts exposed via `/api/ai/buyer-intake` and `/api/ai/listing-guide` for future UI hooks.
+
+- **n8n Workflow Hooks**
+  - `n8nService` triggers `lead_created` and `listing_created` events if `N8N_*` env vars are provided.
+  - Ready-to-import workflow templates in `n8n/`:
+    - `listing_automation.workflow.json`: Listing webhook → normalize → AI copy → sheets archive → MLS/web → social → Slack.
+    - `buyer_intake.workflow.json`: Buyer webhook → AI summary → CRM lead → archive → Slack → calendar hold.
+
+### Roadmap / Future Enhancements
+
+- **Majic Photo Studio**
+  - Brokerage-level preset designer.
+  - MLS media slot syncing and automated virtual tours.
+
+- **Listing Command Center**
+  - Contract/disclosure template library.
+  - MLS/API syndication dashboards.
+  - Seller portal with activity feed and offer tracking.
+
+- **Majic Messenger**
+  - Conversational AI for buyer/seller updates.
+  - A/B testing and deliverability analytics.
+  - Direct send scheduling / outbox overview.
+
+- **Market Insights**
+  - Predictive listing likelihood scores using lead + market data.
+  - Portfolio performance benchmarking (DOM, price trends, marketing ROI).
+  - Heatmaps for lead sources and referral networks.
+
+- **Lead Intake Journeys**
+  - Buyer and seller intake wizards in-app (leveraging existing AI prompts).
+  - Calendar + call assistant integrations for instant follow-up bookings.
+
+- **n8n / External Automations**
+  - Packaged nodes for MLS, CRM, and marketing services.
+  - Bi-directional sync for showing feedback, offer updates, and post-close checklists.
+
+- **Team & Brokerage Ops**
+  - Role-based dashboards with productivity metrics.
+  - White-label portal for brokerage branding.
+  - Commission plan tracking and transaction compliance workflows.
 
 ### Local Development
 
