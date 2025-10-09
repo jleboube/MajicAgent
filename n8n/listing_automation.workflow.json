@@ -1,0 +1,188 @@
+{
+  "name": "MajicAgent Listing Automation",
+  "type": "n8n-workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "majicagent-listing",
+        "options": {
+          "responseData": {
+            "message": "Listing received"
+          }
+        }
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "functionCode": "const listing = items[0].json;\nlisting.normalizedAddress = `${listing.address.street1}, ${listing.address.city}, ${listing.address.state} ${listing.address.postalCode}`.trim();\nlisting.media = (listing.images || []).map((url, index) => ({ url, label: `Image ${index + 1}` }));\nreturn [{ json: listing }];"
+      },
+      "id": "Normalize",
+      "name": "Normalize Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "chat",
+        "model": "gpt-4.1-mini",
+        "text": "Produce a compelling MLS description and a short social caption for the following property: {{$json.normalizedAddress}} with {{$json.bedrooms}} bedrooms, {{$json.bathrooms}} bathrooms, and {{$json.squareFeet}} square feet. Highlight notable amenities: {{$json.amenities}}."
+      },
+      "id": "OpenAI",
+      "name": "AI Description",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "sheetId": "{{ $env.MAJIC_SHEET_ID || 'YOUR_SHEET_ID' }}",
+        "range": "Listings!A:G",
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        },
+        "value": [
+          "={{$json.normalizedAddress}}",
+          "={{$json.listPrice}}",
+          "={{$json.sellerName}}",
+          "={{$json.status || 'Draft'}}",
+          "={{$node['AI Description'].json.choices[0].message.content}}",
+          "={{$json.media[0]?.url}}",
+          "={{$json.createdAt || $now}}"
+        ]
+      },
+      "id": "Sheet",
+      "name": "Archive in Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.MLS_ENDPOINT || 'https://mls.example.com/api/listings' }}",
+        "authentication": "predefinedCredentialType",
+        "jsonParameters": true,
+        "options": {
+          "redirect": {
+            "followRedirects": true
+          }
+        },
+        "bodyParametersJson": "={JSON.stringify($json)}"
+      },
+      "id": "MLS",
+      "name": "Publish to MLS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.SITE_ENDPOINT || 'https://majicagent.com/api/listings' }}",
+        "jsonParameters": true,
+        "bodyParametersJson": "={ JSON.stringify({ listing: $json, description: $node['AI Description'].json.choices[0].message.content }) }"
+      },
+      "id": "Website",
+      "name": "Update Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "={{$env.SLACK_CHANNEL || '#listings'}}",
+        "text": "New listing ready: {{$json.normalizedAddress}}. MLS price {{$json.listPrice}}. MLS copy: {{$node['AI Description'].json.choices[0].message.content}}"
+      },
+      "id": "Slack",
+      "name": "Notify Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "channelId": "={{$env.BUFFER_CHANNEL || 'facebook-profile'}}",
+        "text": "={{$node['AI Description'].json.choices[0].message.content}}",
+        "attachments": [
+          {
+            "image": "={{$json.media[0]?.url}}"
+          }
+        ],
+        "scheduledAt": "={{$now.plus({ minutes: 30 }).toISO()}}"
+      },
+      "id": "Buffer",
+      "name": "Schedule Social",
+      "type": "n8n-nodes-base.buffer",
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Normalize Data": {
+      "main": [
+        [
+          {
+            "node": "AI Description",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Archive in Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Description": {
+      "main": [
+        [
+          {
+            "node": "Publish to MLS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Website",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Schedule Social",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to MLS": {
+      "main": [
+        [
+          {
+            "node": "Notify Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "America/New_York"
+  },
+  "version": 2
+}

@@ -1,0 +1,148 @@
+{
+  "name": "MajicAgent Buyer Intake",
+  "type": "n8n-workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "majicagent-buyer-intake",
+        "options": {
+          "responseData": {
+            "message": "Buyer request received"
+          }
+        }
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "chat",
+        "model": "gpt-4.1-mini",
+        "text": "You are an AI assistant collecting buyer preferences. Using the responses below, summarize the buyer profile and identify any missing details: {{$json.responses}}. End summary with '<EOC>'."
+      },
+      "id": "OpenAI",
+      "name": "Summarize Buyer",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "create",
+        "jsonParameters": true,
+        "additionalFields": {
+          "customPropertiesJson": "={ JSON.stringify({ preferredLocation: $json.location, bedrooms: $json.rooms, amenities: $json.amenities }) }"
+        },
+        "requestBody": {
+          "company": "={{$json.company || 'Buyer Inquiry'}}",
+          "email": "={{$json.email}}",
+          "firstName": "={{$json.firstName}}",
+          "lastName": "={{$json.lastName}}"
+        }
+      },
+      "id": "HubSpot",
+      "name": "Create CRM Lead",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "sheetId": "{{ $env.BUYER_SHEET_ID || 'YOUR_SHEET_ID' }}",
+        "range": "Buyers!A:F",
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        },
+        "value": [
+          "={{$json.firstName}} {{ $json.lastName }}",
+          "={{$json.email}}",
+          "={{$json.phone || ''}}",
+          "={{$json.location}}",
+          "={{$json.budget}}",
+          "={{$node['Summarize Buyer'].json.choices[0].message.content}}"
+        ]
+      },
+      "id": "Sheet",
+      "name": "Archive Intake",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "={{$env.SLACK_CHANNEL || '#leads'}}",
+        "text": "New buyer lead: {{$json.firstName}} {{$json.lastName}}. Summary: {{$node['Summarize Buyer'].json.choices[0].message.content}}"
+      },
+      "id": "Slack",
+      "name": "Notify Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "calendar": "={{$env.CALENDAR_ID || 'primary'}}",
+        "start": "={{$now.plus({ hours: 1 }).toISO()}}",
+        "end": "={{$now.plus({ hours: 2 }).toISO()}}",
+        "title": "Buyer Follow-Up: {{$json.firstName}} {{$json.lastName}}",
+        "description": "={{$node['Summarize Buyer'].json.choices[0].message.content}}"
+      },
+      "id": "Calendar",
+      "name": "Schedule Follow-Up",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Summarize Buyer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create CRM Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Buyer": {
+      "main": [
+        [
+          {
+            "node": "Archive Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create CRM Lead": {
+      "main": [
+        [
+          {
+            "node": "Notify Team",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Schedule Follow-Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "America/New_York"
+  },
+  "version": 2
+}

@@ -1,0 +1,1055 @@
+{
+  "name": "Real Estate Home Listing Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerOn": "webhook",
+        "httpMethod": "POST",
+        "path": "new-listing",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook - New Listing Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "new-listing-webhook",
+      "id": "webhook-new-listing"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "seller_name",
+              "value": "={{ $json.body.seller_name }}"
+            },
+            {
+              "name": "property_address",
+              "value": "={{ $json.body.property_address }}"
+            },
+            {
+              "name": "property_type",
+              "value": "={{ $json.body.property_type }}"
+            },
+            {
+              "name": "bedrooms",
+              "value": "={{ $json.body.bedrooms }}"
+            },
+            {
+              "name": "bathrooms",
+              "value": "={{ $json.body.bathrooms }}"
+            },
+            {
+              "name": "square_feet",
+              "value": "={{ $json.body.square_feet }}"
+            },
+            {
+              "name": "desired_price",
+              "value": "={{ $json.body.desired_price }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Extract Property Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "id": "extract-property-info"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "appXXXXXXXXXXXXXX",
+        "table": "Listings",
+        "columns": {
+          "mappings": [
+            {
+              "fieldName": "Seller Name",
+              "fieldValue": "={{ $json.seller_name }}"
+            },
+            {
+              "fieldName": "Property Address",
+              "fieldValue": "={{ $json.property_address }}"
+            },
+            {
+              "fieldName": "Property Type",
+              "fieldValue": "={{ $json.property_type }}"
+            },
+            {
+              "fieldName": "Bedrooms",
+              "fieldValue": "={{ $json.bedrooms }}"
+            },
+            {
+              "fieldName": "Bathrooms",
+              "fieldValue": "={{ $json.bathrooms }}"
+            },
+            {
+              "fieldName": "Square Feet",
+              "fieldValue": "={{ $json.square_feet }}"
+            },
+            {
+              "fieldName": "Status",
+              "fieldValue": "Pre-Listing"
+            },
+            {
+              "fieldName": "Date Created",
+              "fieldValue": "={{ $now.toFormat('yyyy-MM-dd') }}"
+            }
+          ]
+        }
+      },
+      "name": "Create Listing Record",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "id": "create-listing-record"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Schedule property inspection within 3 days\nconst inspectionDate = new Date();\ninspectionDate.setDate(inspectionDate.getDate() + 3);\n\nreturn {\n  json: {\n    ...items[0].json,\n    inspection_date: inspectionDate.toISOString(),\n    task: 'Schedule Property Inspection'\n  }\n};"
+      },
+      "name": "Schedule Property Inspection",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "id": "schedule-inspection"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "calendarId": "primary",
+        "start": "={{ $json.inspection_date }}",
+        "end": "={{ $json.inspection_date }}",
+        "summary": "Property Inspection - {{ $json.property_address }}",
+        "description": "Property inspection for listing at {{ $json.property_address }}\nSeller: {{ $json.seller_name }}",
+        "attendees": "={{ $json.seller_email }}",
+        "location": "={{ $json.property_address }}"
+      },
+      "name": "Add to Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "id": "add-to-calendar"
+    },
+    {
+      "parameters": {
+        "fromEmail": "agent@realestate.com",
+        "toEmail": "={{ $json.seller_email }}",
+        "subject": "Your Property Listing - Next Steps",
+        "text": "Dear {{ $json.seller_name }},\n\nThank you for choosing us to list your property at {{ $json.property_address }}!\n\nWe've scheduled a property inspection for {{ $json.inspection_date }}.\n\nNext Steps:\n1. Property inspection and professional photography\n2. Comparative Market Analysis (CMA)\n3. Pricing strategy discussion\n4. MLS listing preparation\n5. Marketing campaign launch\n\nWe'll be in touch soon!\n\nBest regards,\nYour Real Estate Team"
+      },
+      "name": "Email - Confirmation to Seller",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1050, 500],
+      "id": "email-confirmation"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": "listings",
+        "text": "🏠 NEW LISTING INTAKE\n\nProperty: {{ $json.property_address }}\nType: {{ $json.property_type }}\nBeds/Baths: {{ $json.bedrooms }}/{{ $json.bathrooms }}\nSq Ft: {{ $json.square_feet }}\nSeller: {{ $json.seller_name }}\nDesired Price: ${{ $json.desired_price }}\n\nInspection scheduled for {{ $json.inspection_date }}",
+        "otherOptions": {}
+      },
+      "name": "Notify Team via Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "id": "notify-slack"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 3
+            }
+          ]
+        }
+      },
+      "name": "Wait 3 Days (Post-Inspection)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1450, 300],
+      "id": "wait-post-inspection"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Conduct CMA - Comparative Market Analysis\n// In real scenario, this would call MLS API or real estate data API\n\nconst property = items[0].json;\nconst sqft = parseInt(property.square_feet);\nconst desiredPrice = parseFloat(property.desired_price);\n\n// Simulate market analysis\nconst pricePerSqft = 250; // Average in area\nconst marketValue = sqft * pricePerSqft;\nconst recommendedPrice = Math.round(marketValue * 0.95); // Slight discount\n\nconst comparables = [\n  { address: '123 Main St', price: 450000, sqft: 1800, beds: 3, baths: 2 },\n  { address: '456 Oak Ave', price: 475000, sqft: 1900, beds: 3, baths: 2.5 },\n  { address: '789 Elm St', price: 425000, sqft: 1700, beds: 3, baths: 2 }\n];\n\nreturn {\n  json: {\n    ...property,\n    cma_completed: true,\n    market_value: marketValue,\n    recommended_price: recommendedPrice,\n    comparables: comparables,\n    price_variance: ((recommendedPrice - desiredPrice) / desiredPrice * 100).toFixed(2)\n  }\n};"
+      },
+      "name": "Conduct CMA (Market Analysis)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1650, 300],
+      "id": "conduct-cma"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": "appXXXXXXXXXXXXXX",
+        "table": "Listings",
+        "id": "={{ $json.record_id }}",
+        "columns": {
+          "mappings": [
+            {
+              "fieldName": "Status",
+              "fieldValue": "CMA Completed"
+            },
+            {
+              "fieldName": "Market Value",
+              "fieldValue": "={{ $json.market_value }}"
+            },
+            {
+              "fieldName": "Recommended Price",
+              "fieldValue": "={{ $json.recommended_price }}"
+            },
+            {
+              "fieldName": "CMA Date",
+              "fieldValue": "={{ $now.toFormat('yyyy-MM-dd') }}"
+            }
+          ]
+        }
+      },
+      "name": "Update Listing with CMA",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [1850, 300],
+      "id": "update-with-cma"
+    },
+    {
+      "parameters": {
+        "fromEmail": "agent@realestate.com",
+        "toEmail": "={{ $json.seller_email }}",
+        "subject": "Market Analysis for {{ $json.property_address }}",
+        "text": "Dear {{ $json.seller_name }},\n\nWe've completed the Comparative Market Analysis for your property at {{ $json.property_address }}.\n\nMarket Analysis Summary:\n- Estimated Market Value: ${{ $json.market_value }}\n- Recommended Listing Price: ${{ $json.recommended_price }}\n- Your Desired Price: ${{ $json.desired_price }}\n- Variance: {{ $json.price_variance }}%\n\nBased on recent comparable sales in your area, we recommend listing at ${{ $json.recommended_price }} to attract qualified buyers while maximizing your return.\n\nLet's schedule a call to discuss the pricing strategy and next steps.\n\nBest regards,\nYour Real Estate Team",
+        "options": {
+          "attachments": "cma_report.pdf"
+        }
+      },
+      "name": "Email - CMA Report to Seller",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [2050, 300],
+      "id": "email-cma-report"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.seller_approval }}",
+              "operation": "equals",
+              "value2": "approved"
+            }
+          ]
+        }
+      },
+      "name": "Check Seller Approval",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2250, 300],
+      "id": "check-approval"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "final_listing_price",
+              "value": "={{ $json.recommended_price }}"
+            },
+            {
+              "name": "listing_status",
+              "value": "Active"
+            }
+          ]
+        }
+      },
+      "name": "Set Final Listing Price",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [2450, 200],
+      "id": "set-final-price"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "https://api.mls-system.com/listings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {},
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "address",
+              "value": "={{ $json.property_address }}"
+            },
+            {
+              "name": "price",
+              "value": "={{ $json.final_listing_price }}"
+            },
+            {
+              "name": "bedrooms",
+              "value": "={{ $json.bedrooms }}"
+            },
+            {
+              "name": "bathrooms",
+              "value": "={{ $json.bathrooms }}"
+            },
+            {
+              "name": "square_feet",
+              "value": "={{ $json.square_feet }}"
+            },
+            {
+              "name": "property_type",
+              "value": "={{ $json.property_type }}"
+            },
+            {
+              "name": "description",
+              "value": "Beautiful {{ $json.property_type }} with {{ $json.bedrooms }} bedrooms and {{ $json.bathrooms }} bathrooms"
+            },
+            {
+              "name": "agent_id",
+              "value": "AGENT123"
+            }
+          ]
+        }
+      },
+      "name": "Post to MLS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [2650, 200],
+      "id": "post-to-mls"
+    },
+    {
+      "parameters": {
+        "operation": "post",
+        "pageId": "your-page-id",
+        "message": "🏠 NEW LISTING ALERT! 🏠\n\n{{ $json.property_address }}\n💰 Price: ${{ $json.final_listing_price }}\n🛏️ Beds: {{ $json.bedrooms }} | 🛁 Baths: {{ $json.bathrooms }}\n📏 Sq Ft: {{ $json.square_feet }}\n\nContact us for more details or to schedule a showing!\n\n#RealEstate #NewListing #HomeForSale"
+      },
+      "name": "Post to Facebook",
+      "type": "n8n-nodes-base.facebook",
+      "typeVersion": 1,
+      "position": [2850, 100],
+      "id": "post-to-facebook"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "text": "🏠 NEW LISTING ALERT!\n\n{{ $json.property_address }}\n💰 ${{ $json.final_listing_price }}\n🛏️ {{ $json.bedrooms }} beds | 🛁 {{ $json.bathrooms }} baths\n📏 {{ $json.square_feet }} sq ft\n\nDM for details!\n\n#RealEstate #NewListing #HomeForSale #JustListed",
+        "additionalFields": {}
+      },
+      "name": "Post to Twitter/X",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 1,
+      "position": [2850, 200],
+      "id": "post-to-twitter"
+    },
+    {
+      "parameters": {
+        "operation": "post",
+        "text": "🏠 NEW LISTING ALERT!\n\n{{ $json.property_address }}\n\n💰 Price: ${{ $json.final_listing_price }}\n🛏️ Bedrooms: {{ $json.bedrooms }}\n🛁 Bathrooms: {{ $json.bathrooms }}\n📏 Square Feet: {{ $json.square_feet }}\n\nThis beautiful {{ $json.property_type }} is now on the market! Perfect for families looking for space and comfort.\n\nInterested? Send me a message or comment below!\n\n#RealEstate #NewListing #HomeForSale #PropertyForSale #RealEstateAgent"
+      },
+      "name": "Post to Instagram",
+      "type": "n8n-nodes-base.instagram",
+      "typeVersion": 1,
+      "position": [2850, 300],
+      "id": "post-to-instagram"
+    },
+    {
+      "parameters": {
+        "resource": "contact",
+        "operation": "getAll",
+        "filters": {
+          "tags": "active-buyers"
+        },
+        "limit": 100
+      },
+      "name": "Get Buyer Email List",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 1,
+      "position": [2850, 400],
+      "id": "get-buyer-list"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Split Out Buyers",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [3050, 400],
+      "id": "split-buyers"
+    },
+    {
+      "parameters": {
+        "fromEmail": "agent@realestate.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "New Listing Alert - {{ $('Set Final Listing Price').item.json.property_address }}",
+        "text": "Hi {{ $json.firstname }},\n\nWe have a new listing that matches your criteria!\n\n🏠 {{ $('Set Final Listing Price').item.json.property_address }}\n💰 ${{ $('Set Final Listing Price').item.json.final_listing_price }}\n🛏️ {{ $('Set Final Listing Price').item.json.bedrooms }} bedrooms\n🛁 {{ $('Set Final Listing Price').item.json.bathrooms }} bathrooms\n📏 {{ $('Set Final Listing Price').item.json.square_feet }} sq ft\n\nWould you like to schedule a showing? Reply to this email or call me!\n\nBest regards,\nYour Real Estate Agent",
+        "options": {
+          "attachments": "property_photos.pdf"
+        }
+      },
+      "name": "Email Potential Buyers",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [3250, 400],
+      "id": "email-buyers"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": "appXXXXXXXXXXXXXX",
+        "table": "Listings",
+        "id": "={{ $('Set Final Listing Price').item.json.record_id }}",
+        "columns": {
+          "mappings": [
+            {
+              "fieldName": "Status",
+              "fieldValue": "Active - Marketing"
+            },
+            {
+              "fieldName": "MLS Listing Date",
+              "fieldValue": "={{ $now.toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "fieldName": "Marketing Campaign Started",
+              "fieldValue": "Yes"
+            }
+          ]
+        }
+      },
+      "name": "Update Listing Status",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [3450, 300],
+      "id": "update-listing-status"
+    },
+    {
+      "parameters": {
+        "triggerOn": "webhook",
+        "httpMethod": "POST",
+        "path": "showing-request",
+        "responseMode": "responseNode"
+      },
+      "name": "Webhook - Showing Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [3650, 300],
+      "webhookId": "showing-request-webhook",
+      "id": "webhook-showing"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "base": "appXXXXXXXXXXXXXX",
+        "table": "Showings",
+        "columns": {
+          "mappings": [
+            {
+              "fieldName": "Listing ID",
+              "fieldValue": "={{ $json.body.listing_id }}"
+            },
+            {
+              "fieldName": "Buyer Name",
+              "fieldValue": "={{ $json.body.buyer_name }}"
+            },
+            {
+              "fieldName": "Buyer Email",
+              "fieldValue": "={{ $json.body.buyer_email }}"
+            },
+            {
+              "fieldName": "Requested Date",
+              "fieldValue": "={{ $json.body.requested_date }}"
+            },
+            {
+              "fieldName": "Status",
+              "fieldValue": "Pending"
+            }
+          ]
+        }
+      },
+      "name": "Log Showing Request",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [3850, 300],
+      "id": "log-showing"
+    },
+    {
+      "parameters": {
+        "fromEmail": "agent@realestate.com",
+        "toEmail": "={{ $json.body.buyer_email }}",
+        "subject": "Showing Request Received",
+        "text": "Hi {{ $json.body.buyer_name }},\n\nWe've received your request to view the property. We'll coordinate with the seller and get back to you within 24 hours to confirm the showing time.\n\nThank you for your interest!\n\nBest regards,\nYour Real Estate Team"
+      },
+      "name": "Email - Showing Confirmation",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [4050, 300],
+      "id": "email-showing-confirmation"
+    },
+    {
+      "parameters": {
+        "triggerOn": "webhook",
+        "httpMethod": "POST",
+        "path": "offer-received",
+        "responseMode": "responseNode"
+      },
+      "name": "Webhook - Offer Received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 700],
+      "webhookId": "offer-received-webhook",
+      "id": "webhook-offer"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "base": "appXXXXXXXXXXXXXX",
+        "table": "Offers",
+        "columns": {
+          "mappings": [
+            {
+              "fieldName": "Listing ID",
+              "fieldValue": "={{ $json.body.listing_id }}"
+            },
+            {
+              "fieldName": "Buyer Name",
+              "fieldValue": "={{ $json.body.buyer_name }}"
+            },
+            {
+              "fieldName": "Offer Amount",
+              "fieldValue": "={{ $json.body.offer_amount }}"
+            },
+            {
+              "fieldName": "Contingencies",
+              "fieldValue": "={{ $json.body.contingencies }}"
+            },
+            {
+              "fieldName": "Closing Date",
+              "fieldValue": "={{ $json.body.proposed_closing_date }}"
+            },
+            {
+              "fieldName": "Status",
+              "fieldValue": "Under Review"
+            },
+            {
+              "fieldName": "Date Received",
+              "fieldValue": "={{ $now.toFormat('yyyy-MM-dd') }}"
+            }
+          ]
+        }
+      },
+      "name": "Log Offer",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [450, 700],
+      "id": "log-offer"
+    },
+    {
+      "parameters": {
+        "fromEmail": "agent@realestate.com",
+        "toEmail": "seller@email.com",
+        "subject": "🎉 OFFER RECEIVED - {{ $json.body.property_address }}",
+        "text": "Great news!\n\nWe've received an offer on your property at {{ $json.body.property_address }}.\n\nOffer Details:\n- Buyer: {{ $json.body.buyer_name }}\n- Offer Amount: ${{ $json.body.offer_amount }}\n- Contingencies: {{ $json.body.contingencies }}\n- Proposed Closing Date: {{ $json.body.proposed_closing_date }}\n\nLet's schedule a call to review this offer and discuss next steps.\n\nBest regards,\nYour Real Estate Team",
+        "options": {
+          "attachments": "offer_document.pdf"
+        }
+      },
+      "name": "Email - Notify Seller of Offer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [650, 700],
+      "id": "email-seller-offer"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": "listings",
+        "text": "🎉 OFFER RECEIVED!\n\nProperty: {{ $json.body.property_address }}\nOffer Amount: ${{ $json.body.offer_amount }}\nBuyer: {{ $json.body.buyer_name }}\n\nStatus: Under Review",
+        "otherOptions": {}
+      },
+      "name": "Notify Team - Offer Received",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [850, 700],
+      "id": "notify-offer-slack"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.offer_status }}",
+              "operation": "equals",
+              "value2": "accepted"
+            }
+          ]
+        }
+      },
+      "name": "Check Offer Status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 700],
+      "id": "check-offer-status"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": "appXXXXXXXXXXXXXX",
+        "table": "Listings",
+        "id": "={{ $json.listing_id }}",
+        "columns": {
+          "mappings": [
+            {
+              "fieldName": "Status",
+              "fieldValue": "Under Contract"
+            },
+            {
+              "fieldName": "Contract Date",
+              "fieldValue": "={{ $now.toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "fieldName": "Sale Price",
+              "fieldValue": "={{ $json.accepted_offer_amount }}"
+            }
+          ]
+        }
+      },
+      "name": "Update to Under Contract",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [1250, 600],
+      "id": "update-under-contract"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "https://api.docusign.com/contracts",
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "document_type",
+              "value": "purchase_agreement"
+            },
+            {
+              "name": "buyer_email",
+              "value": "={{ $json.buyer_email }}"
+            },
+            {
+              "name": "seller_email",
+              "value": "={{ $json.seller_email }}"
+            },
+            {
+              "name": "property_address",
+              "value": "={{ $json.property_address }}"
+            },
+            {
+              "name": "sale_price",
+              "value": "={{ $json.accepted_offer_amount }}"
+            }
+          ]
+        }
+      },
+      "name": "Generate Contract (DocuSign)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1450, 600],
+      "id": "generate-contract"
+    },
+    {
+      "parameters": {
+        "fromEmail": "agent@realestate.com",
+        "toEmail": "={{ $json.seller_email }},{{ $json.buyer_email }}",
+        "subject": "Contract for {{ $json.property_address }} - Action Required",
+        "text": "Congratulations!\n\nThe offer has been accepted! The purchase agreement for {{ $json.property_address }} has been generated and is ready for your signatures.\n\nPlease review and sign the contract via DocuSign at your earliest convenience.\n\nNext Steps:\n1. Review and sign the purchase agreement\n2. Schedule home inspection (if applicable)\n3. Arrange financing (buyer)\n4. Schedule closing date\n\nWe'll coordinate the closing process and keep you informed every step of the way.\n\nBest regards,\nYour Real Estate Team"
+      },
+      "name": "Email - Contract to All Parties",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1650, 600],
+      "id": "email-contract"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "calendarId": "primary",
+        "start": "={{ $json.closing_date }}",
+        "end": "={{ $json.closing_date }}",
+        "summary": "CLOSING - {{ $json.property_address }}",
+        "description": "Property closing for {{ $json.property_address }}\nBuyer: {{ $json.buyer_name }}\nSeller: {{ $json.seller_name }}\nSale Price: ${{ $json.accepted_offer_amount }}",
+        "location": "Title Company Office"
+      },
+      "name": "Schedule Closing",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [1850, 600],
+      "id": "schedule-closing"
+    },
+    {
+      "parameters": {
+        "content": "This workflow automates the complete home listing process from initial intake through contract acceptance.\n\nKey Features:\n- Automated CRM updates\n- Multi-channel marketing\n- Email notifications\n- Calendar integration\n- Offer management\n\nWebhooks:\n1. /new-listing - Trigger new listing\n2. /showing-request - Handle showing requests  \n3. /offer-received - Process offers\n\nIntegrations needed:\n- Airtable (CRM)\n- Email (SMTP/Gmail)\n- Google Calendar\n- Slack\n- Social Media (Facebook, Twitter, Instagram)\n- MLS System API\n- DocuSign",
+        "height": 400,
+        "width": 300
+      },
+      "name": "Workflow Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 100],
+      "id": "workflow-note"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Listing created successfully\", \"listing_id\": $json.record_id } }}",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 400],
+      "id": "respond-webhook"
+    }
+  ],
+  "connections": {
+    "Webhook - New Listing Request": {
+      "main": [
+        [
+          {
+            "node": "Extract Property Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Property Info": {
+      "main": [
+        [
+          {
+            "node": "Create Listing Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Listing Record": {
+      "main": [
+        [
+          {
+            "node": "Schedule Property Inspection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Property Inspection": {
+      "main": [
+        [
+          {
+            "node": "Add to Calendar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email - Confirmation to Seller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Calendar": {
+      "main": [
+        [
+          {
+            "node": "Notify Team via Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Team via Slack": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Days (Post-Inspection)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Days (Post-Inspection)": {
+      "main": [
+        [
+          {
+            "node": "Conduct CMA (Market Analysis)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conduct CMA (Market Analysis)": {
+      "main": [
+        [
+          {
+            "node": "Update Listing with CMA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Listing with CMA": {
+      "main": [
+        [
+          {
+            "node": "Email - CMA Report to Seller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email - CMA Report to Seller": {
+      "main": [
+        [
+          {
+            "node": "Check Seller Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Seller Approval": {
+      "main": [
+        [
+          {
+            "node": "Set Final Listing Price",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Final Listing Price": {
+      "main": [
+        [
+          {
+            "node": "Post to MLS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to MLS": {
+      "main": [
+        [
+          {
+            "node": "Post to Facebook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to Twitter/X",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to Instagram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Buyer Email List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Buyer Email List": {
+      "main": [
+        [
+          {
+            "node": "Split Out Buyers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Buyers": {
+      "main": [
+        [
+          {
+            "node": "Email Potential Buyers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Potential Buyers": {
+      "main": [
+        [
+          {
+            "node": "Update Listing Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Listing Status": {
+      "main": [
+        [
+          {
+            "node": "Webhook - Showing Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Showing Request": {
+      "main": [
+        [
+          {
+            "node": "Log Showing Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Showing Request": {
+      "main": [
+        [
+          {
+            "node": "Email - Showing Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Offer Received": {
+      "main": [
+        [
+          {
+            "node": "Log Offer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Offer": {
+      "main": [
+        [
+          {
+            "node": "Email - Notify Seller of Offer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email - Notify Seller of Offer": {
+      "main": [
+        [
+          {
+            "node": "Notify Team - Offer Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Team - Offer Received": {
+      "main": [
+        [
+          {
+            "node": "Check Offer Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Offer Status": {
+      "main": [
+        [
+          {
+            "node": "Update to Under Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update to Under Contract": {
+      "main": [
+        [
+          {
+            "node": "Generate Contract (DocuSign)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Contract (DocuSign)": {
+      "main": [
+        [
+          {
+            "node": "Email - Contract to All Parties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email - Contract to All Parties": {
+      "main": [
+        [
+          {
+            "node": "Schedule Closing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-09T00:00:00.000Z",
+  "versionId": "1"
+}
