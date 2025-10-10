@@ -26,6 +26,27 @@ const isLocalStorage = endpoint?.includes('minio');
 const isLinodeStorage = endpoint?.includes('linodeobjects.com');
 const forcePathStyle = process.env.S3_FORCE_PATH_STYLE === 'true' || isLocalStorage || isLinodeStorage;
 
+const normalizeOrigin = (origin) => {
+  if (!origin || typeof origin !== 'string') return null;
+  return origin.trim().replace(/\/$/, '');
+};
+
+const defaultCorsOrigins = [
+  'https://majicagent.com',
+  'https://www.majicagent.com',
+  'http://localhost:5173'
+];
+
+const configuredCorsOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.CORS_ORIGIN,
+  process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim()) : []
+].flat();
+
+const allowedCorsOrigins = [...defaultCorsOrigins, ...configuredCorsOrigins]
+  .map(normalizeOrigin)
+  .filter(Boolean);
+
 const s3 = new S3Client({
   region,
   endpoint,
@@ -72,7 +93,7 @@ async function ensureBucketExists() {
   try {
     const corsRules = [
       {
-        AllowedOrigins: ['https://majicagent.com', 'https://www.majicagent.com', 'http://localhost:5173'],
+        AllowedOrigins: allowedCorsOrigins,
         AllowedMethods: ['GET', 'PUT', 'HEAD', 'OPTIONS'],
         AllowedHeaders: ['*'],
         ExposeHeaders: ['ETag'],

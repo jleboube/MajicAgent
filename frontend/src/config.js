@@ -1,15 +1,24 @@
+const normalize = (value) => value.replace(/\/$/, '');
+
 const detectDefaultBaseUrl = () => {
   if (typeof window === 'undefined') {
+    return '';
+  }
+
+  const { origin, hostname } = window.location;
+
+  if (/^(localhost|127\.0\.0\.1)/.test(hostname)) {
     return 'http://localhost:4004';
   }
 
-  if (window.location.origin.includes('localhost:5173')) {
-    return 'http://localhost:4004';
-  }
-
-  return '';
+  return origin;
 };
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || detectDefaultBaseUrl();
-export const API_BASE_URL = rawBaseUrl.replace(/\/$/, '');
-export const GOOGLE_OAUTH_URL = `${API_BASE_URL || ''}/api/auth/google`;
+let rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+if (!rawBaseUrl) {
+  rawBaseUrl = detectDefaultBaseUrl();
+}
+
+export const API_BASE_URL = normalize(rawBaseUrl || '');
+export const GOOGLE_OAUTH_URL = `${API_BASE_URL ? `${API_BASE_URL}/api/auth/google` : '/api/auth/google'}`;

@@ -25,13 +25,32 @@ const { initMinio } = require('./init-minio');
 
 const app = express();
 
-const allowedOrigins = new Set([
+const normalizeOrigin = (origin) => {
+  if (!origin || typeof origin !== 'string') return null;
+  return origin.trim().replace(/\/$/, '');
+};
+
+const defaultOrigins = [
   'https://majicagent.com',
   'https://www.majicagent.com',
   'http://localhost:4004',
   'http://localhost:5173',
   'http://192.168.69.106:4004'
-]);
+];
+
+const envOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.CORS_ORIGIN,
+  process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
+    : []
+].flat();
+
+const allowedOrigins = new Set(
+  [...defaultOrigins, ...envOrigins]
+    .map(normalizeOrigin)
+    .filter(Boolean)
+);
 
 app.disable('x-powered-by');
 app.set('etag', false);
@@ -39,7 +58,13 @@ app.set('etag', false);
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin) || process.env.NODE_ENV !== 'production') {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (allowedOrigins.has(normalizedOrigin) || process.env.NODE_ENV !== 'production') {
         return callback(null, true);
       }
       return callback(new Error('Not allowed by CORS'));

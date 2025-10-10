@@ -89,7 +89,8 @@ docker compose up --build
 ```
 
 - Backend runs on `http://localhost:4004` and uses MongoDB plus MinIO (S3 compatible) for local artifact storage.
-- Frontend runs on `http://localhost:5173` (Vite dev server) and targets the backend API. Update `frontend/.env` to point at production hosts when ready.
+- Frontend runs on `http://localhost:5173` (Vite dev server) and targets the backend API. Leave `VITE_API_BASE_URL` empty for production so it automatically resolves to the deployed origin.
+- Set `FRONTEND_URL` and `GOOGLE_REDIRECT_URI` to your public domain in `.env`, and add every allowed domain (comma separated) to `CORS_ORIGINS` before deploying.
 - Provide valid credentials for Google OAuth, OpenAI, Anthropic, and Akamai Object Storage in `.env` to unlock AI copy generation and secure storage flows.
 
 > Legacy static assets now live in `frontend-legacy/`. Set `SERVE_LEGACY_FRONTEND=true` in `.env` if you need the previous experience served directly from the backend container.

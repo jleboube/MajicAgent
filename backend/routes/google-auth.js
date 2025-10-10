@@ -32,8 +32,21 @@ router.get('/google/callback',
       console.log(`Google OAuth successful for user: ${req.user.email}`);
       
       // Redirect to frontend with token
-      // Use relative path to ensure proper routing through the backend
-      const redirectUrl = `/?token=${token}&auth=google&role=${req.user.role}`;
+      const configuredFrontend = process.env.FRONTEND_URL?.trim().replace(/\/$/, '');
+      const fallbackOrigin = req.headers.origin || `${req.protocol}://${req.get('host')}`;
+      let baseRedirect = configuredFrontend && configuredFrontend.length > 0
+        ? configuredFrontend
+        : '';
+
+      if (!baseRedirect) {
+        if (process.env.NODE_ENV !== 'production') {
+          baseRedirect = 'http://localhost:5173';
+        } else {
+          baseRedirect = fallbackOrigin?.replace(/\/$/, '') || '';
+        }
+      }
+
+      const redirectUrl = `${baseRedirect}/?token=${token}&auth=google&role=${req.user.role}`;
       res.redirect(redirectUrl);
       
     } catch (error) {
