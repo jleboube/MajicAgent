@@ -21,6 +21,7 @@ services:
       - "traefik.http.routers.majicagent.rule=Host(`majicagent.com`) || Host(`www.majicagent.com`)"
       - "traefik.http.routers.majicagent.tls=true"
       - "traefik.http.routers.majicagent.tls.certresolver=cloudflare"
+      - "traefik.http.services.majicagent.loadbalancer.server.port=4004"
 
   mongo:
     image: mongo:latest
